@@ -3,6 +3,7 @@
 
 extern bool g_AlwaysNAK;
 extern bool g_NoResponse;
+extern bool g_bPrintTDUM;
 
 extern "C" int encText(unsigned char* pSrc, unsigned char* pDest);
 extern "C" int descText(unsigned char* pSrc, unsigned char* pDest, int nEncLen);
@@ -28,9 +29,11 @@ void ServerSession::Start()
 bool ServerSession::IsWBAdmin(char* pCommandID)
 {
     std::string strCommandID = pCommandID;
+    // 수신된 명령이 아래와 같은 경우는 wbadmin->wbiotserver로 전송처리 
     if (strCommandID == "PDUM" || strCommandID == "PFST" || strCommandID == "PCNG" || strCommandID == "PSEP" ||
         strCommandID == "PUPG" || strCommandID == "PVER" || strCommandID == "PSET" || strCommandID == "PFCC" ||
-        strCommandID == "PAST" || strCommandID == "PFCR" || strCommandID == "PFRS" || strCommandID == "PRSI")
+        strCommandID == "PAST" || strCommandID == "PFCR" || strCommandID == "PFRS" || strCommandID == "PRSI" || 
+        strCommandID == "ULOG")
     {
         return true;
     }
@@ -133,8 +136,11 @@ std::string ServerSession::parsePayload(std::string strCommand, std::string strP
     else if (strCommand == "PUPG")
     {
         std::ostringstream osPayload;
+        // 구버전 PUPG 프로토콜 테스트
+        //int OptionSize[] = { 1, 40, 5, 50, 10, 10 };
         int OptionSize[] = { 1, 40, 5, 50, 10, 10, 15 };
-        for (int nOption = 0; nOption < 7; nOption++)
+        int nMaxOption = sizeof(OptionSize)/sizeof(int);
+        for (int nOption = 0; nOption < nMaxOption; nOption++)
         {
             std::string strCommandOption = strCommandOptions[nOption];
             convert::InsertBlank(strCommandOption, OptionSize[nOption]);
@@ -170,7 +176,7 @@ std::string ServerSession::parsePayload(std::string strCommand, std::string strP
     return os.str();
 }
 
-void ServerSession::sendACK(char ack, char* pDirection)
+void ServerSession::sendACK(char ack, bool bPrint)
 {
     if (g_NoResponse == false)
     {
@@ -198,7 +204,8 @@ void ServerSession::sendACK(char ack, char* pDirection)
             BOOST_LOG_TRIVIAL(fatal) << "Unknown ACK";
             return;
         }
-        BOOST_LOG_TRIVIAL(debug) << "[TX]" << strACK;
+        if (bPrint)
+            BOOST_LOG_TRIVIAL(debug) << "[TX]" << strACK;
     }
     else
     {
@@ -257,6 +264,13 @@ void ServerSession::handleReadHeader(const boost::system::error_code& ec, std::s
                 //    || (int)m_ReadMsg.GetData()[0] == GatewayEnum::ACK
                 //    || (int)m_ReadMsg.GetData()[0] == GatewayEnum::NAK))
                 BOOST_LOG_TRIVIAL(debug) << "[RX]" << getStrACK(m_ReadMsg.GetData()[0]);
+                if (m_ReadMsg.GetData()[0] == GatewayEnum::EOT)
+                {
+                    if (m_nTOFF > 0)
+                        BOOST_LOG_TRIVIAL(info) << "TOFF 수신 개수: " << m_nTOFF;
+                    if (m_nTDDD > 0)
+                        BOOST_LOG_TRIVIAL(info) << "TDDD 수신 개수: " << m_nTDDD;
+                }
                 readMsgAsync(m_ReadMsg.GetData(), GatewayMessage::HEADER_LENGTH);
             }
             else
@@ -277,6 +291,77 @@ void ServerSession::handleReadHeader(const boost::system::error_code& ec, std::s
     }
 }
 
+/// <summary>
+/// 게이트웨이에서 전송한 패킷 처리
+/// </summary>
+void ServerSession::processGatewayPacket()
+{
+    bool bRet = m_ReadMsg.CheckCRC();
+    if (bRet == false)
+    {
+        sendACK(GatewayEnum::NAK);
+        return;
+    }
+    sendACK(GatewayEnum::ACK);
+
+    // WBIoTGATE                    WBServer
+    // connect -------------------->
+    //         TTIM---------------->
+    //         <----------------PTIM  
+    //         <----------------EOT
+    //         <--------------------disconnect
+    if (!strncmp(m_ReadMsg.GetCommandID(), "TTIM", 4))
+    {
+        sendPTIM();
+        sendACK(GatewayEnum::EOT);
+        Close();
+    }
+    else if (!strncmp(m_ReadMsg.GetCommandID(), "TOFF", 4))
+    {
+        // 릴리즈 모드를 위해 수신된 TOFF 개수 카운트
+        m_nTOFF++;
+    }
+    else if (!strncmp(m_ReadMsg.GetCommandID(), "TDDD", 4))
+    {
+        m_nTDDD++;
+    }
+
+    if ((!strncmp(m_ReadMsg.GetCommandID(), "TOFF", 4) || !strncmp(m_ReadMsg.GetCommandID(), "TDDD", 4)) && g_bPrintTDUM == false)
+    {
+        // TOFF, TDDD 출력이 안되도록 설정되어 있다면 출력하지 않는다.
+        ;
+    }
+    else
+    {
+        BOOST_LOG_TRIVIAL(debug) << "[RX]" << m_ReadMsg.MakeRawPrintString();
+        BOOST_LOG_TRIVIAL(info) << m_ReadMsg.MakePrintString();
+        boost::shared_ptr<GatewayMessage> msg(new GatewayMessage(m_ReadMsg.GetData()));
+        m_Channel->BroadcastMsg("wbadmin", msg);
+    }
+}
+
+/// <summary>
+/// WBAdmin에서 전송한 ULOG와 원격명령처리
+/// </summary>
+/// <param name="error"></param>
+/// <param name="nReadLen"></param>
+void ServerSession::processWBAdminPacket()
+{
+    if (!strncmp(m_ReadMsg.GetCommandID(), "ULOG", 4))
+    {
+        // ULOG의 경우 BroadCast 전송을 위해 type을 설정
+        SetClientType("wbadmin");
+    }
+    else
+    {
+        // wbagdmin이 보낸 원격명령을 mediator를 통해 wbagent로 전달한다.
+        std::string strBody = m_ReadMsg.GetBody();
+        strBody[strBody.size() - 2] = 0;
+        strBody[strBody.size() - 1] = 0;
+        std::string strCommandOptions = parsePayload(m_ReadMsg.GetCommandID(), strBody);
+        m_Mediator->PushRequest(CommandRequest(m_ReadMsg.GetCommandID(), strCommandOptions, ""));
+    }
+}
 
 void ServerSession::handleReadBody(const boost::system::error_code& error, size_t nReadLen)
 {
@@ -287,61 +372,15 @@ void ServerSession::handleReadBody(const boost::system::error_code& error, size_
     if (!error)
     {
         m_ReadMsg.GetData()[m_ReadMsg.GetMsgLength()] = 0;
+        
         if (IsWBAdmin(m_ReadMsg.GetCommandID()) == false)
         {
-            // 통신서버에서 전송한 원격명령을 출력하고 CRC 체크
-            BOOST_LOG_TRIVIAL(debug) << "[RX]" << m_ReadMsg.MakeRawPrintString();
-            BOOST_LOG_TRIVIAL(info) << m_ReadMsg.MakePrintString();
-            ret = m_ReadMsg.CheckCRC();
+            processGatewayPacket();
         }
         else
         {
-            // wbadmin에서 전송한 원격명령에서 대해서는 출력하지 않고 CRC 체코드 성공한 것으로 설정
-            ret = true;
+            processWBAdminPacket();
         }
-        if (ret == true)
-        {
-            // WBIoTGATE                    WBServer
-            // connect -------------------->
-            //         TTIM---------------->
-            //         <----------------PTIM  
-            //         <----------------EOT
-            //         <--------------------disconnect
-            if (!strncmp(m_ReadMsg.GetCommandID(), "TTIM", 4))
-            {
-                sendPTIM();
-                sendACK(GatewayEnum::EOT);
-                Close();
-            }
-            // WBAdmin or WBServer UI apps           WBServer h                  WBIoTGATE
-            // connect --------------------> 
-            // command --------------------> connect --------------------------->
-            //                                       command ------------------->
-            //         <-------------------- proxy <------------ message or ACK 
-            //                                     <------------------ disconnect  
-            //         ..........................................................
-            // disconnect ----------------->
-            else if (!strncmp(m_ReadMsg.GetCommandID(), "ULOG", 4))
-            {
-                SetClientType("wbadmin");
-            }
-            else if (IsWBAdmin(m_ReadMsg.GetCommandID()))
-            {
-                // wbagdmin이 보낸 원격명령을 mediator를 통해 wbagent로 전달한다.
-                std::string strBody = m_ReadMsg.GetBody();
-                strBody[strBody.size() - 2] = 0;
-                strBody[strBody.size() - 1] = 0;
-                std::string strCommandOptions = parsePayload(m_ReadMsg.GetCommandID(), strBody);
-                m_Mediator->PushRequest(CommandRequest(m_ReadMsg.GetCommandID(), strCommandOptions, ""));
-            }
-            else
-            {
-                // wbagent에서 수신한 응답에 대해서는 ACK를 전송한다.
-                sendACK(GatewayEnum::ACK);
-            }
-        }
-        else
-            sendACK(GatewayEnum::NAK);
         readMsgAsync(m_ReadMsg.GetData(), GatewayMessage::HEADER_LENGTH);
     }
     else
@@ -459,7 +498,7 @@ void greenlink_server::dequeueRequest()
             std::string strSubCommand1 = "", strSubCommand2 = "";
             curRequest.GetParameter(strSubCommand1, strSubCommand2);
             boost::shared_ptr<GatewayMessage> 
-                msg(new GatewayMessage("PDUM", "9900001", "001", strSubCommand1.c_str(), strSubCommand1.size()));
+                msg(new GatewayMessage("TCNG", "9900001", "001", strSubCommand1.c_str(), strSubCommand1.size()));
             GetGatewayChennel()->BroadcastMsg("wbadmin", msg);
             boost::lock_guard<boost::mutex> lock(m_mutex);
             m_Requests.pop_front();

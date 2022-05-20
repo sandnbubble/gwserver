@@ -15,12 +15,13 @@ extern "C" int descText(unsigned char* pSrc, unsigned char* pDest, int nEncLen);
 char* _client_id = "9900001";
 char* _chimney_code = "001";
 
-std::string strIP = "192.168.1.3";
+std::string strIP = "44.151.63.107";
 std::string strPort = "9090";
 // 테스트버전 포트
 std::string strLocalPort = "5010";
 bool g_NoResponse = false;
 bool g_AlwaysNAK = false;
+bool g_bPrintTDUM = false;
 
 typedef struct
 {
@@ -207,7 +208,7 @@ void DispCommand()
     BOOST_LOG_TRIVIAL(trace) << "[11] 방지시설 정상여부 관계정보 변경요청" << " " << DispCommandOptions("PFRS");
     BOOST_LOG_TRIVIAL(trace) << "[12] 통신서버 IP변경 요청\t\t" << " " << DispCommandOptions("PRSI");
     BOOST_LOG_TRIVIAL(trace) << "[e] 설정파일수정, [L] 설정파일적용, [i] WBIoTGATE IP 변경";
-    BOOST_LOG_TRIVIAL(trace) << "[N] 강제NAK, [n] 정상NAK, [B] 무응답, [b] 정상응답 ";
+    BOOST_LOG_TRIVIAL(trace) << "[N] 강제NAK, [n] 정상NAK, [B] 무응답, [b] 정상응답, [d] 디버그모드, [r] 릴리즈모드 ";
     BOOST_LOG_TRIVIAL(trace) << "q  종료";
 }
 
@@ -298,6 +299,17 @@ int RunSystem()
                 g_NoResponse = true;
                 BOOST_LOG_TRIVIAL(trace) << "강제 무응답 설정";
             }
+            else if (strInput == "d")
+            {
+                g_bPrintTDUM = true;
+                BOOST_LOG_TRIVIAL(trace) << "디버그 모드";
+            }
+            else if (strInput == "r")
+            {
+                g_bPrintTDUM = false;
+                BOOST_LOG_TRIVIAL(trace) << "릴리즈 모드";
+            }
+
             else if (strInput == "1")
             {
                 // PDUM

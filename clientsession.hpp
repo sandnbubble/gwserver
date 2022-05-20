@@ -15,6 +15,7 @@ class Mediator;
 extern std::string strIP;
 extern bool g_NoResponse;
 extern bool g_AlwaysNAK;
+extern bool g_bPrintTDUM;
 
 class ClientSession : public  BasicSession
 {
@@ -133,7 +134,9 @@ public:
         {
             bool ret = false;
             boost::system::error_code ec;
-            size_t nWritten = 0;
+            size_t nRecvTDUM = 0;
+            BOOST_LOG_TRIVIAL(debug) << "[TX]" << msg->MakeRawPrintString();
+            BOOST_LOG_TRIVIAL(info) << msg->MakePrintString();
             ret = SendPacketWithTimeout(msg->GetData(), msg->GetMsgLength(), ec);
             if (ret == true)
             {
@@ -156,16 +159,20 @@ public:
                             char ack_value = GatewayEnum::ACK;
                             if (bRet)
                             {
-                                BOOST_LOG_TRIVIAL(debug) << "[RX]" << m_ReadMsg.MakeRawPrintString();
-                                BOOST_LOG_TRIVIAL(info) << m_ReadMsg.MakePrintString();
+                                if (g_bPrintTDUM == true)
+                                {
+                                    BOOST_LOG_TRIVIAL(debug) << "[RX]" << m_ReadMsg.MakeRawPrintString();
+                                    BOOST_LOG_TRIVIAL(info) << m_ReadMsg.MakePrintString();
+                                }
                                 if (g_AlwaysNAK)
                                     ack_value = GatewayEnum::NAK;
                                 else
                                     ack_value = GatewayEnum::ACK;
+                                nRecvTDUM++;
                             }
                             else
                                 ack_value = GatewayEnum::NAK;
-                            sendACK(ack_value);
+                            sendACK(ack_value, false);
                         }
                     }
                     else
@@ -175,6 +182,7 @@ public:
                         break;
                     }
                 }
+                BOOST_LOG_TRIVIAL(info) << "TDUM 수신 개수 : " << nRecvTDUM;
             }
             Close();
         }
@@ -250,11 +258,6 @@ private:
                     ret = ReadMsgSync();
                     if (ret != 0)
                     {
-                        // 수신 데이터의 crc value를 체크하고 수신결과를 전송
-                        // async_read_some을 사용하면 body 수신이 완료되지 않은 상태에서 crc에러가 발생하고
-                        // handle_read_body는 종료되지 않고 부족한 body를 채울때까지 작업이 지연되는 문제가 있다.
-                        // socket_.cancel로는 handle_read_body가 종료되지 않기때문에 이후 모든 수신이 정상적으로
-                        // 되지 않는다. 해결할 수 없는 문제일듯.
                         m_ReadMsg.GetData()[m_ReadMsg.GetMsgLength()] = 0;
                         bool bRet = m_ReadMsg.CheckCRC();
                         char ack_value = GatewayEnum::ACK;
@@ -267,6 +270,14 @@ private:
                             else
                                 ack_value = GatewayEnum::ACK;
                             sendACK(ack_value);
+                            // gateway로 부터 메시지를 수신한 후 Server thread로 전달해서 연결중인 wbadmin에 
+                            // 패킷을 전송해야하는데 방법이 없다. Server thread로 메시지를 전송해야하는데 현재
+                            // server thread에서 사용하는 특정 큐를 무한 풀링하며 수신된 메시지를 처리하는 방식으로는
+                            // 느려터져서 답이 안나올 것으로 예측된다. 스레간에 큐를 사용하지 않고 직접 소켓을 사용하는 
+                            // 방법을 찾아야한다. boost에서 제공하는 시그널을 살펴봐야겠다.
+                            // 일단 PDUM과 같이 내부에서 송수신을 반복하는 기능을 제외하고 일회성 패킷만을 수신받는
+                            // 원격명령을 mediator를 위해 구현해본다.
+                            m_Mediator->PushRequest(CommandRequest(m_ReadMsg.GetCommandID(), m_ReadMsg.GetData(), ""));
                             break;
                         }
                         else
@@ -360,7 +371,7 @@ private:
     /// sendMsg를 참고하기 바란다.
     /// </summary>
     /// <param name="ack">enum { ACK = 0x06, NAK = 0x15, EOT = 0x04 }</param>
-    void sendACK(char ack)
+    void sendACK(char ack, bool bPrint=true)
     {
         if (g_NoResponse == false)
         {
@@ -387,7 +398,8 @@ private:
                 BOOST_LOG_TRIVIAL(fatal) << "Unknown ACK";
                 return;
             }
-            BOOST_LOG_TRIVIAL(debug) << "[TX]" << strACK;
+            if (bPrint == true)
+                BOOST_LOG_TRIVIAL(debug) << "[TX]" << strACK;
         }
         else
         {

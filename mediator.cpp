@@ -64,6 +64,7 @@ void Mediator::dequeueRequest()
             std::string subCommand1="", subCommand2="";
             curRequest.GetParameter(subCommand1, subCommand2);
 
+            
             if (command_id == "PDUM")
             {
                 boost::shared_ptr<GatewayMessage> msg(new GatewayMessage(command_id.c_str(), (char*)m_ClientID.c_str(), (char*)m_ChimneyCode.c_str(), subCommand1.c_str(), subCommand1.size()));
@@ -150,6 +151,12 @@ void Mediator::dequeueRequest()
                     msg(new GatewayMessage(command_id.c_str(), (char*)m_ClientID.c_str(), (char*)m_ChimneyCode.c_str(), subCommand1.c_str(), subCommand1.size()));
                 int nResult = 0;
                 m_Client->SendMsg(msg, false, false, true, nResult);
+            }
+            // 여기서부터의 조건은 통신서버의 원격명령에 대한 게이트웨이의 응답을 전송해주는 기능들을 수행할 조건들이다.
+            else if (command_id == "TCNG")
+            {
+                // Server thread로 연결된 wbadmin에 수신패킷을 전송하도록 한다.
+                m_Server->PushRequest(CommandRequest("TCNG", subCommand1, subCommand2));
             }
             else
             {

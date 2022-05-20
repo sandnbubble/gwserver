@@ -133,12 +133,20 @@ private:
     void handleReadHeader(const error_code& ec, size_t GetMsgLength);
     void handleReadBody(const error_code& ec, size_t nReadLen);
     bool sendPTIM();
-    void sendACK(char ack, char* pDirection = "GREENLINK->WBAGENT");
+    void sendACK(char ack, bool bPrint=true);
     std::string getStrACK(char ack);
     std::string parsePayload(std::string strCommand, std::string strPayload);
     bool IsWBAdmin(char* pCommandID);
 
+    void processGatewayPacket();
+    void processWBAdminPacket();
+
+
 private:
+    // 수신 TOFF 개수. 하나의 세션에서 한번만 온다.
+    unsigned int m_nTOFF = 0;
+    // 수신 TDDD 개수. 하나의 세션에서 한번만 온다.
+    unsigned int m_nTDDD = 0;
     bool m_bStop = false;
     std::string m_RemoteIP = "";
     GatewayMessage m_ReadMsg;
