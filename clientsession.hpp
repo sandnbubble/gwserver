@@ -164,6 +164,8 @@ public:
                                     BOOST_LOG_TRIVIAL(debug) << "[RX]" << m_ReadMsg.MakeRawPrintString();
                                     BOOST_LOG_TRIVIAL(info) << m_ReadMsg.MakePrintString();
                                 }
+                                std::string strMsg(m_ReadMsg.GetData(), m_ReadMsg.GetMsgLength());
+                                m_Mediator->PushRequest(CommandRequest(m_ReadMsg.GetCommandID(), strMsg, ""));
                                 if (g_AlwaysNAK)
                                     ack_value = GatewayEnum::NAK;
                                 else
@@ -277,7 +279,8 @@ private:
                             // 방법을 찾아야한다. boost에서 제공하는 시그널을 살펴봐야겠다.
                             // 일단 PDUM과 같이 내부에서 송수신을 반복하는 기능을 제외하고 일회성 패킷만을 수신받는
                             // 원격명령을 mediator를 위해 구현해본다.
-                            m_Mediator->PushRequest(CommandRequest(m_ReadMsg.GetCommandID(), m_ReadMsg.GetData(), ""));
+                            std::string strMsg(m_ReadMsg.GetData(), m_ReadMsg.GetMsgLength());
+                            m_Mediator->PushRequest(CommandRequest(m_ReadMsg.GetCommandID(), strMsg, ""));
                             break;
                         }
                         else

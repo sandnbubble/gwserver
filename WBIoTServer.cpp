@@ -35,7 +35,11 @@ bool loadIni()
     try
     {
         CommandOptions.clear();
-        std::ifstream file("/wbiot/bin/wbtester.ini");
+#ifdef _DEBUG_
+        std::ifstream file("/wbiot/bin/gwserver.ini");
+#else
+        std::ifstream file("gwserver.ini");
+#endif
         if (file.is_open())
         {
             std::string strLine;
@@ -58,7 +62,7 @@ bool loadIni()
         }
         else
         {
-            std::cout << "설정파일을 찾을 수 없습니다. (wbtester.ini)" << std::endl;
+            std::cout << "설정파일을 찾을 수 없습니다. (gwserver.ini)" << std::endl;
             return false;
         }
     }
@@ -153,7 +157,11 @@ std::string GetCommandOptions(std::string strCommand)
 void editCommandOptions()
 {
     // CreateProcess를 사용하는 것을 고려해보라고 하지만 의미없다.
-    WinExec("notepad c:/wbiot/bin/wbtester.ini", SW_NORMAL);
+#ifdef _DEBUG_
+    WinExec("notepad /wbiot/bin/wbtester.ini", SW_NORMAL);
+#else
+    WinExec("notepad wbtester.ini", SW_NORMAL);
+#endif
 }
 
 WORD get_colour(boost::log::trivial::severity_level level)
@@ -571,18 +579,18 @@ int Close(HANDLE hHandle)
 
 int main(int argc, char* argv[])
 {
-    const char szUniqueNamedMutex[] = "WBIoTServer.exe";
+    const char szUniqueNamedMutex[] = "gwserver.exe";
     HANDLE hHandle = CreateMutex(NULL, TRUE, szUniqueNamedMutex);
     if (ERROR_ALREADY_EXISTS == GetLastError())
     {
         // Program already running somewhere
-        std::cerr << "WBIoTServer.exe already is running. This program cannot be run multiple times." << std::endl;
+        std::cerr << "gwserver.exe already is running. This program cannot be run multiple times." << std::endl;
         return(1); // Exit program
     }
 
     if (argc != 4)
     {
-        std::cerr << "Usage: WBIoTServer <WBIoTGATE ip> <WBIoTGATE port> <local port>\n";
+        std::cerr << "Usage: gwserver <gwf100 ip> <gwf100 port> <local port>\n";
     }
     else
     {

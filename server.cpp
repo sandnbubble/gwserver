@@ -296,13 +296,11 @@ void ServerSession::handleReadHeader(const boost::system::error_code& ec, std::s
 /// </summary>
 void ServerSession::processGatewayPacket()
 {
-    bool bRet = m_ReadMsg.CheckCRC();
-    if (bRet == false)
-    {
-        sendACK(GatewayEnum::NAK);
-        return;
-    }
-    sendACK(GatewayEnum::ACK);
+    BOOST_LOG_TRIVIAL(debug) << "[RX]" << m_ReadMsg.MakeRawPrintString();
+    BOOST_LOG_TRIVIAL(info) << m_ReadMsg.MakePrintString();
+    // m.ReadMsg로 GatewayMessage 생성시 CRC를 추가하지 않도록 bAppendCRC를 false로 설정
+    boost::shared_ptr<GatewayMessage> msg(new GatewayMessage(m_ReadMsg.GetData(), m_ReadMsg.GetMsgLength(), false));
+    m_Channel->BroadcastMsg("wbadmin", msg);
 
     // WBIoTGATE                    WBServer
     // connect -------------------->
@@ -316,27 +314,18 @@ void ServerSession::processGatewayPacket()
         sendACK(GatewayEnum::EOT);
         Close();
     }
-    else if (!strncmp(m_ReadMsg.GetCommandID(), "TOFF", 4))
-    {
-        // 릴리즈 모드를 위해 수신된 TOFF 개수 카운트
-        m_nTOFF++;
-    }
-    else if (!strncmp(m_ReadMsg.GetCommandID(), "TDDD", 4))
-    {
-        m_nTDDD++;
-    }
-
-    if ((!strncmp(m_ReadMsg.GetCommandID(), "TOFF", 4) || !strncmp(m_ReadMsg.GetCommandID(), "TDDD", 4)) && g_bPrintTDUM == false)
-    {
-        // TOFF, TDDD 출력이 안되도록 설정되어 있다면 출력하지 않는다.
-        ;
-    }
     else
     {
-        BOOST_LOG_TRIVIAL(debug) << "[RX]" << m_ReadMsg.MakeRawPrintString();
-        BOOST_LOG_TRIVIAL(info) << m_ReadMsg.MakePrintString();
-        boost::shared_ptr<GatewayMessage> msg(new GatewayMessage(m_ReadMsg.GetData()));
-        m_Channel->BroadcastMsg("wbadmin", msg);
+        if (!strncmp(m_ReadMsg.GetCommandID(), "TOFF", 4))
+        {
+            // 릴리즈 모드를 위해 수신된 TOFF 개수 카운트
+            m_nTOFF++;
+        }
+        else if (!strncmp(m_ReadMsg.GetCommandID(), "TDDD", 4))
+        {
+            m_nTDDD++;
+        }
+        sendACK(GatewayEnum::ACK);
     }
 }
 
@@ -497,9 +486,11 @@ void greenlink_server::dequeueRequest()
             std::string command_id = curRequest.GetCommandID();
             std::string strSubCommand1 = "", strSubCommand2 = "";
             curRequest.GetParameter(strSubCommand1, strSubCommand2);
-            boost::shared_ptr<GatewayMessage> 
-                msg(new GatewayMessage("TCNG", "9900001", "001", strSubCommand1.c_str(), strSubCommand1.size()));
-            GetGatewayChennel()->BroadcastMsg("wbadmin", msg);
+            if (command_id == "TCMD")
+            {
+                boost::shared_ptr<GatewayMessage> msg(new GatewayMessage(strSubCommand1.data(), strSubCommand1.size(), false));
+                GetGatewayChennel()->BroadcastMsg("wbadmin", msg);
+            }
             boost::lock_guard<boost::mutex> lock(m_mutex);
             m_Requests.pop_front();
         }

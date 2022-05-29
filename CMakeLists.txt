@@ -3,15 +3,21 @@
 #
 cmake_minimum_required (VERSION 3.8)
 
-project("WBIoTServer")
+project("gwserver")
 
 SET(CMAKE_CXX_STANDARD 11)
 SET(Boost_USE_STATIC_LIBS ON)
 SET(Boost_USE_MULTITHREAD ON)
 SET(Mysqlcppconn_USE_STATIC_LIBS ON)
 
+
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    add_compile_definitions("_DEBUG_")
+endif()
+
 add_compile_definitions("_MSVC_" "_WBDEBUG_")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+
 
 #set(MYSQL_ROOT "D:/DevTools/MySQLConnector")
 # Settings.hpp를 사용하지 않지만 wbagent와의 소스호환성을 위해 MySQLConnector를 사용한다.
@@ -28,11 +34,11 @@ FIND_PACKAGE(Boost 1.58.0 REQUIRED COMPONENTS thread date_time log filesystem)
     LINK_DIRECTORIES(${Boost_LIBRARY_DIRS} ${MYSQL_LIBRARY_DIR})
     SET(USED_LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_DATE_TIME_LIBRARY} ${Boost_LOG_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
 	LINK_DIRECTORIES(${Boost_LIBRARY_DIRS} ${MYSQL_LIBRARY_DIR})
-    add_executable (wbiotserver
+    add_executable (gwserver
         "wbiotserver.cpp" 
         "server.cpp"
         "mediator.cpp"
         "../wbagent/seed128cbc/KISA_SEED_CBC.c" 
         )
-    TARGET_LINK_LIBRARIES(wbiotserver ${USED_LIBS})
+    TARGET_LINK_LIBRARIES(gwserver ${USED_LIBS})
 endif()

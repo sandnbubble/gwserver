@@ -180,6 +180,6 @@ private:
     boost::mutex m_mutex;
     std::deque<CommandRequest> m_Requests;
     bool m_bStop = false;
-    unsigned int m_DequeueFreq = 100;
+    unsigned int m_DequeueFreq = 1;
 
 };

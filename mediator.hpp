@@ -74,7 +74,7 @@ private:
     ClientSession* m_Client;
     greenlink_server* m_Server;
     bool m_bStop = false;
-    int m_DequeueFreq = 100;
+    int m_DequeueFreq = 1;
     std::string m_ClientID;
     std::string m_ChimneyCode;
     std::deque<CommandRequest> m_Requests;
