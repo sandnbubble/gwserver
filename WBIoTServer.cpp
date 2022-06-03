@@ -36,9 +36,9 @@ bool loadIni()
     {
         CommandOptions.clear();
 #ifdef _DEBUG_
-        std::ifstream file("/wbiot/bin/gwserver.ini");
+        //std::ifstream file("/wbiot/bin/gwserver.ini");
 #else
-        std::ifstream file("gwserver.ini");
+        std::ifstream file("/wbiot/bin/gwserver.ini");
 #endif
         if (file.is_open())
         {
