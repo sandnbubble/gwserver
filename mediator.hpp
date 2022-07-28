@@ -1,7 +1,7 @@
 #pragma once
 #include <deque>
 #include <boost/thread.hpp>
-#include "../wbagent/sharedinclude/GatewayMessage.hpp"
+#include "../gwagent/sharedinclude/GatewayMessage.hpp"
 
 class ClientSession;
 class greenlink_server;

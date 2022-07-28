@@ -3,9 +3,9 @@
 #include <boost/bind.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "../wbagent/sharedinclude/mysqlfunc.hpp"
-#include "../wbagent/sharedinclude/settings.hpp"
-#include "../wbagent/sharedinclude/basic_session.hpp"
+#include "../gwagent/sharedinclude/mysqlfunc.hpp"
+#include "../gwagent/sharedinclude/settings.hpp"
+#include "../gwagent/sharedinclude/basic_session.hpp"
 #include "mediator.hpp"
 #include <mutex>
 

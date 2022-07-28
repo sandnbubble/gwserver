@@ -35,10 +35,10 @@ FIND_PACKAGE(Boost 1.58.0 REQUIRED COMPONENTS thread date_time log filesystem)
     SET(USED_LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_DATE_TIME_LIBRARY} ${Boost_LOG_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
 	LINK_DIRECTORIES(${Boost_LIBRARY_DIRS} ${MYSQL_LIBRARY_DIR})
     add_executable (gwserver
-        "wbiotserver.cpp" 
+        "gwserver.cpp" 
         "server.cpp"
         "mediator.cpp"
-        "../wbagent/seed128cbc/KISA_SEED_CBC.c" 
+        "../gwagent/seed128cbc/KISA_SEED_CBC.c" 
         )
     TARGET_LINK_LIBRARIES(gwserver ${USED_LIBS})
 endif()

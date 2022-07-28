@@ -2,7 +2,7 @@
 //
 
 
-#include "WBIoTServer.h"
+#include "gwserver.h"
 #include "server.hpp"
 #include "clientsession.hpp"
 #include "mediator.hpp"
@@ -36,9 +36,9 @@ bool loadIni()
     {
         CommandOptions.clear();
 #ifdef _DEBUG_
-        //std::ifstream file("/wbiot/bin/gwserver.ini");
+        std::ifstream file("/iotgw/bin/gwserver.ini");
 #else
-        std::ifstream file("/wbiot/bin/gwserver.ini");
+        std::ifstream file("gwserver.ini");
 #endif
         if (file.is_open())
         {

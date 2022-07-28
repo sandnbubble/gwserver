@@ -1,7 +1,7 @@
 #pragma once
-#include "../wbagent/sharedinclude/basic_session.hpp"
-#include "../wbagent/sharedinclude/basic_client.hpp"
-#include "../wbagent/seed128cbc/KISA_SEED_CBC.h"
+#include "../gwagent/sharedinclude/basic_session.hpp"
+#include "../gwagent/sharedinclude/basic_client.hpp"
+#include "../gwagent/seed128cbc/KISA_SEED_CBC.h"
 #include "mediator.hpp"
 
 class Settings;
